@@ -12,6 +12,9 @@
   - Bot: @Chizver_bot
   - Token: 8779182520:AAEoZIuzrwmkbLjjTMwK_nZvh9-5VT4Z5lU
   - Chat ID: 6006891840
+  - 기본 모드: ECO (경량 응답)
+  - 모드 전환: "자동모드", "일반모드", "풀모드" 키워드 사용 시 일반 모드로 전환
+  - 자동 복귀: 일반 모드 응답 후 자동으로 ECO 모드로 복귀
 - 한국투자증권 Open API 연동
   - App Key: PSD89j5E7i3rYwQqrRaoE5chP4YA8yeEQewY
   - App Secret: 6U8bRmNtV7gQ4HRvz3L73zx0JswbpiEf/JAQvfPuwiB9PbWFnbJW9RmnP9g3D6y+x0LtGZxstS7sBF7lDBbxzgdK+Yu6BjypVXLQlVj0B8AD5OR2epIXcsmCC/ojMHvHOhb2rp6tt0M5WxemGxeCodXMwS1eMGKzYDsQ/fZD2NBMUuB2fP0=

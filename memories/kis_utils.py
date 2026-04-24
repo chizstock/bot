@@ -490,7 +490,7 @@ def dante_score(ta):
         optional += 1
         reasons.append("구름대 상방")
 
-    return mandatory, optional, reasons
+    return {"mandatory": mandatory, "bonus": optional, "total": mandatory * 2 + optional, "details": reasons}
 
 # === TELEGRAM ===
 def send_telegram(text):
