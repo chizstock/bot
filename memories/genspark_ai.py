@@ -168,9 +168,14 @@ class GenSparkChat:
             # 먼저 입력창 찾기 - 더 많은 선택자 시도
             input_found = self.driver.execute_script("""
                 const selectors = [
+                    'textarea[placeholder*="무엇이든"]', 
+                    'textarea[placeholder*="물어보고"]', 
+                    'textarea[placeholder*="만들어보세요"]', 
                     'textarea[placeholder*="무엇을"]', 
                     'textarea[placeholder*="도와"]', 
                     'textarea',
+                    'input[placeholder*="무엇이든"]',
+                    'input[placeholder*="물어보고"]',
                     'input[placeholder*="무엇을"]',
                     'input[placeholder*="도와"]',
                     'div[contenteditable="true"]',
@@ -191,7 +196,7 @@ class GenSparkChat:
                 const allInputs = document.querySelectorAll('textarea, input, div[contenteditable]');
                 for (let el of allInputs) {
                     const placeholder = el.getAttribute('placeholder') || '';
-                    if (placeholder.includes('무엇') || placeholder.includes('도와') || placeholder.includes('message')) {
+                    if (placeholder.includes('무엇이든') || placeholder.includes('물어보고') || placeholder.includes('무엇') || placeholder.includes('도와') || placeholder.includes('message')) {
                         return {found: true, selector: 'placeholder', tag: el.tagName};
                     }
                 }
@@ -210,9 +215,14 @@ class GenSparkChat:
             # JavaScript로 값 설정
             self.driver.execute_script("""
                 const selectors = [
+                    'textarea[placeholder*="무엇이든"]',
+                    'textarea[placeholder*="물어보고"]',
+                    'textarea[placeholder*="만들어보세요"]',
                     'textarea[placeholder*="무엇을"]',
                     'textarea[placeholder*="도와"]',
                     'textarea',
+                    'input[placeholder*="무엇이든"]',
+                    'input[placeholder*="물어보고"]',
                     'input[placeholder*="무엇을"]',
                     'input[placeholder*="도와"]',
                     'div[contenteditable="true"]',
@@ -232,12 +242,13 @@ class GenSparkChat:
                     const allInputs = Array.from(document.querySelectorAll('textarea, input[type="text"], div[contenteditable]'));
                     const visibleInputs = allInputs.filter(el => el.offsetParent !== null);
                     if (visibleInputs.length > 0) {
-                        inputEl = visibleInputs[visibleInputs.length - 1]; // 마지막(보통 채팅 입력창)
+                        inputEl = visibleInputs[visibleInputs.length - 1];
                     }
                 }
                 
                 if (inputEl) {
                     inputEl.focus();
+                    inputEl.click();
                     if (inputEl.isContentEditable || inputEl.getAttribute('contenteditable') === 'true') {
                         inputEl.innerText = arguments[0];
                     } else {
@@ -255,9 +266,14 @@ class GenSparkChat:
             # Enter 키 전송
             self.driver.execute_script("""
                 const selectors = [
+                    'textarea[placeholder*="무엇이든"]',
+                    'textarea[placeholder*="물어보고"]',
+                    'textarea[placeholder*="만들어보세요"]',
                     'textarea[placeholder*="무엇을"]',
                     'textarea[placeholder*="도와"]',
                     'textarea',
+                    'input[placeholder*="무엇이든"]',
+                    'input[placeholder*="물어보고"]',
                     'input[placeholder*="무엇을"]',
                     'input[placeholder*="도와"]',
                     'div[contenteditable="true"]',
