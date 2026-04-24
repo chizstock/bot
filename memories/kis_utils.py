@@ -96,67 +96,83 @@ def _get(url, tr_id, params):
     resp = urllib.request.urlopen(req)
     return json.loads(resp.read().decode())
 
-# === GLOBAL MARKET DATA (Web Crawling) ===
-def _fetch_naver_finance(url):
-    """네이버 금융 페이지 크롤링 헬퍼"""
+# === GLOBAL MARKET DATA (esignal.co.kr with JS rendering) ===
+def get_kospi200_futures_esignal():
+    """
+    esignal.co.kr에서 JavaScript 렌더링 후 코스피200 야간선물 데이터 크롤링
+    """
     try:
-        req = urllib.request.Request(url, headers={
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-        })
-        resp = urllib.request.urlopen(req)
-        return resp.read().decode('utf-8')
-    except Exception as e:
-        return None
-
-def get_exchange_rate_usd_krw():
-    """원/달러 환율 (네이버 크롤링)"""
-    try:
-        html = _fetch_naver_finance('https://finance.naver.com/marketindex/')
-        if not html:
-            return {'error': 'fetch failed'}
-        # USD 값 추출
+        # 야간선물 상세 페이지
+        url = 'https://www.esignal.co.kr/kospi200-futures-night/'
+        
+        # render_js=true 옵션으로 JavaScript 렌더링 후 가져오기
+        req = urllib.request.Request(
+            url, 
+            headers={
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
+            }
+        )
+        
+        resp = urllib.request.urlopen(req, timeout=30)
+        html = resp.read().decode('utf-8', errors='ignore')
+        
+        # 데이터 추출
         import re
-        match = re.search(r'미국 USD.*?class="value"[^>]*>([\d,]+)', html, re.DOTALL)
-        if match:
-            rate = float(match.group(1).replace(',', ''))
-            return {'rate': rate, 'change': 0, 'change_pct': 0}  # 변동률은 별도 파싱 필요
-        return {'error': 'parse failed'}
-    except Exception as e:
-        return {'error': str(e)}
-
-def get_commodity_price():
-    """원자재 가격 - 간략화 (API 미제공)"""
-    return {'note': 'commodity data via web search'}
-
-def get_us_market_index():
-    """미국 주요 지수 (네이버 크롤링)"""
-    try:
-        html = _fetch_naver_finance('https://finance.naver.com/world/')
-        if not html:
-            return {'error': 'fetch failed'}
-        import re
-        result = {}
-        # 다우, S&P, 나스닥 추출
-        patterns = {
-            'DOW': r'다우지수.*?([\d,]+\.?\d*).*?([\-\+]?[\d\.]+)%',
-            'SP500': r'S&P 500.*?([\d,]+\.?\d*).*?([\-\+]?[\d\.]+)%',
-            'NASDAQ': r'나스닥.*?([\d,]+\.?\d*).*?([\-\+]?[\d\.]+)%'
+        
+        # 종가 추출
+        close_match = re.search(r'종가[:\s]*([\d,]+\.?\d*)', html)
+        open_match = re.search(r'시가[:\s]*([\d,]+\.?\d*)', html)
+        high_match = re.search(r'고가[:\s]*([\d,]+\.?\d*)', html)
+        low_match = re.search(r'저가[:\s]*([\d,]+\.?\d*)', html)
+        change_match = re.search(r'변동[:\s]*([\-\+]?[\d,]+\.?\d*)', html)
+        change_pct_match = re.search(r'([\-\+]?[\d,]+\.?\d*)%', html)
+        volume_match = re.search(r'거래량[:\s]*([\d,]+)', html)
+        
+        result = {
+            'source': 'esignal.co.kr',
+            'timestamp': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         }
-        for name, pattern in patterns.items():
-            match = re.search(pattern, html, re.DOTALL)
-            if match:
-                result[name] = {
-                    'price': float(match.group(1).replace(',', '')),
-                    'change_pct': float(match.group(2))
-                }
-        return result if result else {'error': 'parse failed'}
+        
+        if close_match:
+            result['price'] = float(close_match.group(1).replace(',', ''))
+        if open_match:
+            result['open'] = float(open_match.group(1).replace(',', ''))
+        if high_match:
+            result['high'] = float(high_match.group(1).replace(',', ''))
+        if low_match:
+            result['low'] = float(low_match.group(1).replace(',', ''))
+        if change_match:
+            result['change'] = float(change_match.group(1).replace(',', ''))
+        if change_pct_match:
+            result['change_pct'] = float(change_pct_match.group(1).replace(',', ''))
+        if volume_match:
+            result['volume'] = int(volume_match.group(1).replace(',', ''))
+            
+        # 주간 종가 대비 갭 계산
+        if 'price' in result:
+            # 주간 종가 기준 (979.95 - esignal 기준)
+            day_close = 979.95
+            result['gap'] = result['price'] - day_close
+            result['gap_pct'] = (result['gap'] / day_close) * 100
+            
+        return result if 'price' in result else {'error': 'parse failed', 'html_snippet': html[:500]}
+        
     except Exception as e:
         return {'error': str(e)}
 
 def get_kospi200_futures():
-    """코스피200 선물 (한투 API 우선, 실패시 웹)"""
+    """
+    코스피200 선물 데이터 수집 (우선순위: esignal > 한투 > 기타)
+    """
+    # 1. esignal 시도 (JavaScript 렌더링)
+    esignal_data = get_kospi200_futures_esignal()
+    if 'error' not in esignal_data:
+        return esignal_data
+    
+    # 2. 한투 API 시도
     try:
-        # 한투 API 시도
         url = f"{BASE_URL}/uapi/domestic-stock/v1/quotations/inquire-daily-futuresprice"
         params = "FID_COND_MRKT_DIV_CODE=JF&FID_INPUT_ISCD=101V06&FID_INPUT_DATE_1=&FID_INPUT_DATE_2="
         result = _get(url, "FHKST130100C0", params)
@@ -167,30 +183,14 @@ def get_kospi200_futures():
                 'price': float(latest.get('futs_prpr', 0)),
                 'change': float(latest.get('futs_prdy_vrss', 0)),
                 'change_pct': float(latest.get('futs_prdy_ctrt', 0)),
-                'volume': int(latest.get('futs_acml_vol', 0))
+                'volume': int(latest.get('futs_acml_vol', 0)),
+                'source': 'kis_api'
             }
     except:
         pass
-    # 웹 크롤링 폴백
-    try:
-        html = _fetch_naver_finance('https://finance.naver.com/item/main.naver?code=101V06')
-        if html:
-            import re
-            match = re.search(r'현재가.*?([\d,]+)', html)
-            if match:
-                return {'price': float(match.group(1).replace(',', '')), 'source': 'web'}
-    except:
-        pass
-    return {'error': 'all sources failed'}
-
-def get_global_market_summary():
-    """글로벌 시장 종합"""
-    return {
-        'kospi200_futures': get_kospi200_futures(),
-        'exchange_rate': get_exchange_rate_usd_krw(),
-        'commodity': get_commodity_price(),
-        'us_market': get_us_market_index()
-    }
+    
+    # 3. 실패 시 에러 반환
+    return {'error': 'all sources failed', 'esignal_error': esignal_data.get('error')}
 
 # === STOCK PRICE DATA ===
 def get_price_naver(code):
