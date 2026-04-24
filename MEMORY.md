@@ -7,9 +7,7 @@
 
 ## Preferences
 - 언어: 한국어
-- 매일 아침 7:30 주식시장 브리핑 크론 활성화 (id: loop_a57af0cafa45)
-- 매일 11:00 장중 단테전략 추천종목 업데이트 (id: loop_65224bc08725)
-- 매일 14:50 장마감전 최종 브리핑 + 추천종목 (id: loop_f470e65e5235)
+- 평일(월~금) 아침 7:30 주식시장 브리핑 크론 (id: loop_4d6c121988bd)
 - 텔레그램 채팅으로 아침 알람 수신
   - Bot: @Chizstock_bot
   - Token: 8632142968:AAEeQCAYbnh4-AqcReJClDAeQD5x8y6l8gA
