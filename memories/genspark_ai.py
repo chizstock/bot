@@ -29,7 +29,7 @@ class GenSparkChat:
         self.headless = headless
         self.timeout = timeout
         self.driver = None
-        self.chat_url = "https://www.genspark.ai/chat"
+        self.chat_url = "https://www.genspark.ai/agents?type=ai_chat"
         self.session_active = False
         
     def _init_driver(self):
@@ -162,28 +162,151 @@ class GenSparkChat:
             result = self.start_chat()
             if result is None:
                 return "로그인이 필요합니다. 위 가이드를 따라주세요."
-            
-        # JavaScript로 입력
+
+        # JavaScript로 입력 (더 유연한 방식)
         try:
-            self.driver.execute_script("""
-                const textarea = document.querySelector('textarea');
-                if (textarea) {
-                    textarea.value = arguments[0];
-                    textarea.dispatchEvent(new Event('input', { bubbles: true }));
+            # 먼저 입력창 찾기 - 더 많은 선택자 시도
+            input_found = self.driver.execute_script("""
+                const selectors = [
+                    'textarea[placeholder*="무엇을"]', 
+                    'textarea[placeholder*="도와"]', 
+                    'textarea',
+                    'input[placeholder*="무엇을"]',
+                    'input[placeholder*="도와"]',
+                    'div[contenteditable="true"]',
+                    '[role="textbox"]',
+                    'input[type="text"]'
+                ];
+                for (let sel of selectors) {
+                    const el = document.querySelector(sel);
+                    if (el && el.offsetParent !== null) {
+                        // 요소가 화면에 보이는지 확인
+                        const rect = el.getBoundingClientRect();
+                        if (rect.width > 0 && rect.height > 0) {
+                            return {found: true, selector: sel, tag: el.tagName};
+                        }
+                    }
                 }
+                // placeholder 텍스트로 찾기
+                const allInputs = document.querySelectorAll('textarea, input, div[contenteditable]');
+                for (let el of allInputs) {
+                    const placeholder = el.getAttribute('placeholder') || '';
+                    if (placeholder.includes('무엇') || placeholder.includes('도와') || placeholder.includes('message')) {
+                        return {found: true, selector: 'placeholder', tag: el.tagName};
+                    }
+                }
+                return {found: false};
+            """)
+
+            if not input_found.get('found'):
+                # 페이지 스크린샷 저장 (디버깅용)
+                try:
+                    self.driver.save_screenshot("genspark_debug.png")
+                    print("스크린샷 저장: genspark_debug.png")
+                except:
+                    pass
+                return "입력창을 찾을 수 없습니다. 페이지 구조를 확인해주세요."
+
+            # JavaScript로 값 설정
+            self.driver.execute_script("""
+                const selectors = [
+                    'textarea[placeholder*="무엇을"]',
+                    'textarea[placeholder*="도와"]',
+                    'textarea',
+                    'input[placeholder*="무엇을"]',
+                    'input[placeholder*="도와"]',
+                    'div[contenteditable="true"]',
+                    'input[type="text"]'
+                ];
+                let inputEl = null;
+                for (let sel of selectors) {
+                    const el = document.querySelector(sel);
+                    if (el && el.offsetParent !== null) {
+                        inputEl = el;
+                        break;
+                    }
+                }
+                
+                if (!inputEl) {
+                    // 모든 input/textarea 중에서 가장 아래쪽에 있는 것 선택
+                    const allInputs = Array.from(document.querySelectorAll('textarea, input[type="text"], div[contenteditable]'));
+                    const visibleInputs = allInputs.filter(el => el.offsetParent !== null);
+                    if (visibleInputs.length > 0) {
+                        inputEl = visibleInputs[visibleInputs.length - 1]; // 마지막(보통 채팅 입력창)
+                    }
+                }
+                
+                if (inputEl) {
+                    inputEl.focus();
+                    if (inputEl.isContentEditable || inputEl.getAttribute('contenteditable') === 'true') {
+                        inputEl.innerText = arguments[0];
+                    } else {
+                        inputEl.value = arguments[0];
+                    }
+                    inputEl.dispatchEvent(new Event('input', { bubbles: true }));
+                    inputEl.dispatchEvent(new Event('change', { bubbles: true }));
+                    return true;
+                }
+                return false;
             """, message)
+
+            time.sleep(0.8)
+
+            # Enter 키 전송
+            self.driver.execute_script("""
+                const selectors = [
+                    'textarea[placeholder*="무엇을"]',
+                    'textarea[placeholder*="도와"]',
+                    'textarea',
+                    'input[placeholder*="무엇을"]',
+                    'input[placeholder*="도와"]',
+                    'div[contenteditable="true"]',
+                    'input[type="text"]'
+                ];
+                let inputEl = null;
+                for (let sel of selectors) {
+                    const el = document.querySelector(sel);
+                    if (el && el.offsetParent !== null) {
+                        inputEl = el;
+                        break;
+                    }
+                }
+                
+                if (!inputEl) {
+                    const allInputs = Array.from(document.querySelectorAll('textarea, input[type="text"], div[contenteditable]'));
+                    const visibleInputs = allInputs.filter(el => el.offsetParent !== null);
+                    if (visibleInputs.length > 0) {
+                        inputEl = visibleInputs[visibleInputs.length - 1];
+                    }
+                }
+                
+                if (inputEl) {
+                    inputEl.dispatchEvent(new KeyboardEvent('keydown', {
+                        key: 'Enter',
+                        code: 'Enter',
+                        keyCode: 13,
+                        which: 13,
+                        bubbles: true,
+                        cancelable: true
+                    }));
+                    inputEl.dispatchEvent(new KeyboardEvent('keyup', {
+                        key: 'Enter',
+                        code: 'Enter',
+                        keyCode: 13,
+                        which: 13,
+                        bubbles: true
+                    }));
+                }
+            """)
+
             time.sleep(0.5)
-            
-            # Enter 전송
-            textarea = self.driver.find_element(By.TAG_NAME, "textarea")
-            textarea.send_keys(Keys.RETURN)
-            
+
         except Exception as e:
             return f"입력 오류: {e}"
-        
+
         if not wait_for_response:
             return None
-            
+
         return self._wait_for_response(response_timeout)
         
     def _wait_for_response(self, timeout=60):
