@@ -4,6 +4,39 @@
 """
 import urllib.request, json, datetime, statistics, time, re
 
+# === GENSPARK AI 채팅 ===
+def ask_genspark(message, mode="pro"):
+    """GenSpark AI Plus 채팅에 질문"""
+    try:
+        from genspark_ai import ask_genspark as _ask
+        return _ask(message, mode=mode, headless=True)
+    except Exception as e:
+        return f"GenSpark AI 오류: {e}"
+
+def analyze_with_genspark(stock_name, stock_code=None):
+    """GenSpark AI로 주식 분석 (전문 프롬프트)"""
+    try:
+        from genspark_ai import analyze_stock_genspark
+        return analyze_stock_genspark(stock_name, stock_code)
+    except Exception as e:
+        return f"분석 오류: {e}"
+
+def summarize_with_genspark(text, max_length=500):
+    """GenSpark AI로 뉴스/텍스트 요약"""
+    try:
+        from genspark_ai import summarize_genspark
+        return summarize_genspark(text, max_length)
+    except Exception as e:
+        return f"요약 오류: {e}"
+
+def interpret_with_genspark(data, context=""):
+    """GenSpark AI로 데이터 해석"""
+    try:
+        from genspark_ai import interpret_data_genspark
+        return interpret_data_genspark(data, context)
+    except Exception as e:
+        return f"해석 오류: {e}"
+
 # === CONFIG ===
 APP_KEY = "PSD89j5E7i3rYwQqrRaoE5chP4YA8yeEQewY"
 APP_SECRET = "6U8bRmNtV7gQ4HRvz3L73zx0JswbpiEf/JAQvfPuwiB9PbWFnbJW9RmnP9g3D6y+x0LtGZxstS7sBF7lDBbxzgdK+Yu6BjypVXLQlVj0B8AD5OR2epIXcsmCC/ojMHvHOhb2rp6tt0M5WxemGxeCodXMwS1eMGKzYDsQ/fZD2NBMUuB2fP0="

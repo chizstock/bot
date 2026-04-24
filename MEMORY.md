@@ -15,6 +15,10 @@
   - 기본 모드: ECO (경량 응답)
   - 모드 전환: "자동모드", "일반모드", "풀모드" 키워드 사용 시 일반 모드로 전환
   - 자동 복귀: 일반 모드 응답 후 자동으로 ECO 모드로 복귀
+- GenSpark AI Plus 연동
+  - 파일: memories/genspark_ai.py
+  - 기능: 주식 분석, 뉴스 요약, 데이터 해석
+  - 사용: `ask_genspark(prompt)`, `analyze_with_genspark(name, code)`, `summarize_with_genspark(text)`
 - 한국투자증권 Open API 연동
   - App Key: PSD89j5E7i3rYwQqrRaoE5chP4YA8yeEQewY
   - App Secret: 6U8bRmNtV7gQ4HRvz3L73zx0JswbpiEf/JAQvfPuwiB9PbWFnbJW9RmnP9g3D6y+x0LtGZxstS7sBF7lDBbxzgdK+Yu6BjypVXLQlVj0B8AD5OR2epIXcsmCC/ojMHvHOhb2rp6tt0M5WxemGxeCodXMwS1eMGKzYDsQ/fZD2NBMUuB2fP0=
