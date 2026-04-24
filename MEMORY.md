@@ -9,8 +9,8 @@
 - 언어: 한국어
 - 평일(월~금) 아침 7:30 주식시장 브리핑 크론 (id: loop_4d6c121988bd)
 - 텔레그램 채팅으로 아침 알람 수신
-  - Bot: @Chizstock_bot
-  - Token: 8632142968:AAEeQCAYbnh4-AqcReJClDAeQD5x8y6l8gA
+  - Bot: @Chizver_bot
+  - Token: 8779182520:AAEoZIuzrwmkbLjjTMwK_nZvh9-5VT4Z5lU
   - Chat ID: 6006891840
 - 한국투자증권 Open API 연동
   - App Key: PSD89j5E7i3rYwQqrRaoE5chP4YA8yeEQewY
