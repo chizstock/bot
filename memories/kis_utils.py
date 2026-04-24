@@ -2,7 +2,7 @@
 한국투자증권 Open API + 기술적 분석 유틸리티
 브리핑 크론에서 공통으로 사용
 """
-import urllib.request, json, datetime, statistics, time
+import urllib.request, json, datetime, statistics, time, re
 
 # === CONFIG ===
 APP_KEY = "PSD89j5E7i3rYwQqrRaoE5chP4YA8yeEQewY"
@@ -96,77 +96,100 @@ def _get(url, tr_id, params):
     resp = urllib.request.urlopen(req)
     return json.loads(resp.read().decode())
 
-# === GLOBAL MARKET DATA (esignal.co.kr with JS rendering) ===
+# === GLOBAL MARKET DATA (esignal.co.kr with Selenium) ===
 def get_kospi200_futures_esignal():
     """
-    esignal.co.kr에서 JavaScript 렌더링 후 코스피200 야간선물 데이터 크롤링
+    esignal.co.kr에서 Selenium으로 JavaScript 렌더링 후 코스피200 야간선물 데이터 추출
     """
     try:
-        # 야간선물 상세 페이지
+        from selenium import webdriver
+        from selenium.webdriver.chrome.service import Service
+        from selenium.webdriver.chrome.options import Options
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from webdriver_manager.chrome import ChromeDriverManager
+        
+        driver = None
+        
+        # Chrome 옵션 설정 (헤드리스 모드)
+        chrome_options = Options()
+        chrome_options.add_argument('--headless')
+        chrome_options.add_argument('--no-sandbox')
+        chrome_options.add_argument('--disable-dev-shm-usage')
+        chrome_options.add_argument('--disable-gpu')
+        chrome_options.add_argument('--window-size=1920,1080')
+        chrome_options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36')
+        
+        # ChromeDriver 설정
+        service = Service(ChromeDriverManager().install())
+        driver = webdriver.Chrome(service=service, options=chrome_options)
+        
+        # 페이지 로드
         url = 'https://www.esignal.co.kr/kospi200-futures-night/'
+        driver.get(url)
         
-        # render_js=true 옵션으로 JavaScript 렌더링 후 가져오기
-        req = urllib.request.Request(
-            url, 
-            headers={
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-                'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
-            }
-        )
+        # JavaScript 렌더링 대기
+        wait = WebDriverWait(driver, 10)
+        try:
+            wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, 'body')))
+        except:
+            pass
         
-        resp = urllib.request.urlopen(req, timeout=30)
-        html = resp.read().decode('utf-8', errors='ignore')
+        time.sleep(5)
         
-        # 데이터 추출
-        import re
-        
-        # 종가 추출
-        close_match = re.search(r'종가[:\s]*([\d,]+\.?\d*)', html)
-        open_match = re.search(r'시가[:\s]*([\d,]+\.?\d*)', html)
-        high_match = re.search(r'고가[:\s]*([\d,]+\.?\d*)', html)
-        low_match = re.search(r'저가[:\s]*([\d,]+\.?\d*)', html)
-        change_match = re.search(r'변동[:\s]*([\-\+]?[\d,]+\.?\d*)', html)
-        change_pct_match = re.search(r'([\-\+]?[\d,]+\.?\d*)%', html)
-        volume_match = re.search(r'거래량[:\s]*([\d,]+)', html)
+        # 텍스트 추출
+        text = driver.find_element(By.TAG_NAME, 'body').text
         
         result = {
-            'source': 'esignal.co.kr',
-            'timestamp': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            'source': 'esignal.co.kr (selenium)',
+            'timestamp': time.strftime('%Y-%m-%d %H:%M:%S')
         }
         
-        if close_match:
-            result['price'] = float(close_match.group(1).replace(',', ''))
-        if open_match:
-            result['open'] = float(open_match.group(1).replace(',', ''))
-        if high_match:
-            result['high'] = float(high_match.group(1).replace(',', ''))
-        if low_match:
-            result['low'] = float(low_match.group(1).replace(',', ''))
-        if change_match:
-            result['change'] = float(change_match.group(1).replace(',', ''))
-        if change_pct_match:
-            result['change_pct'] = float(change_pct_match.group(1).replace(',', ''))
-        if volume_match:
-            result['volume'] = int(volume_match.group(1).replace(',', ''))
-            
+        # 종가 추출: "970.95 (-9.00, -0.92%)" 패턴
+        price_match = re.search(r'(\d{3,4}\.\d{2})\s*\(([\-\+]?\d+\.\d+),\s*([\-\+]?\d+\.\d+)%\)', text)
+        if price_match:
+            result['price'] = float(price_match.group(1))
+            result['change'] = float(price_match.group(2))
+            result['change_pct'] = float(price_match.group(3))
+        
+        # 시가/고가/저가 추출
+        ohl_match = re.search(r'시가\s*고가\s*저가\s*([\d.]+)\s*([\d.]+)\s*([\d.]+)', text)
+        if ohl_match:
+            result['open'] = float(ohl_match.group(1))
+            result['high'] = float(ohl_match.group(2))
+            result['low'] = float(ohl_match.group(3))
+        
+        # 주간 종가/거래량 추출
+        day_close_match = re.search(r'주간\s*종가\s*거래량\s*갱신\s*시간\s*([\d.]+)\s*([\d,]+)', text)
+        if day_close_match:
+            result['day_close'] = float(day_close_match.group(1))
+            result['volume'] = int(day_close_match.group(2).replace(',', ''))
+        
+        # 1차/2차 목표가 추출
+        target_match = re.search(r'1차목표:\s*([\d.]+)\s*2차목표:\s*([\d.]+)', text)
+        if target_match:
+            result['target_1'] = float(target_match.group(1))
+            result['target_2'] = float(target_match.group(2))
+        
         # 주간 종가 대비 갭 계산
-        if 'price' in result:
-            # 주간 종가 기준 (979.95 - esignal 기준)
-            day_close = 979.95
-            result['gap'] = result['price'] - day_close
-            result['gap_pct'] = (result['gap'] / day_close) * 100
-            
-        return result if 'price' in result else {'error': 'parse failed', 'html_snippet': html[:500]}
+        if 'price' in result and 'day_close' in result:
+            result['gap'] = round(result['price'] - result['day_close'], 2)
+            result['gap_pct'] = round((result['gap'] / result['day_close']) * 100, 2)
+        
+        driver.quit()
+        return result if 'price' in result else {'error': 'parse failed'}
         
     except Exception as e:
+        if 'driver' in locals() and driver:
+            driver.quit()
         return {'error': str(e)}
 
 def get_kospi200_futures():
     """
-    코스피200 선물 데이터 수집 (우선순위: esignal > 한투 > 기타)
+    코스피200 선물 데이터 수집 (우선순위: esignal selenum > 한투 > 기타)
     """
-    # 1. esignal 시도 (JavaScript 렌더링)
+    # 1. esignal selenum 시도 (JavaScript 렌더링)
     esignal_data = get_kospi200_futures_esignal()
     if 'error' not in esignal_data:
         return esignal_data
